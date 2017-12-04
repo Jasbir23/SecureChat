@@ -28,6 +28,8 @@ const { width, height } = Dimensions.get("window");
 import * as firebase from "firebase";
 import MainStore from "../MainStore/MainStore";
 import { observer } from "mobx-react/native";
+var RSAKey = require("react-native-rsa");
+var rsa = new RSAKey();
 
 @observer
 export default class App extends React.Component {
@@ -111,39 +113,77 @@ export default class App extends React.Component {
           contentContainerStyle={{ paddingTop: 20 }}
           keyExtractor={(item, index) => index}
           renderItem={({ item }) => {
-            return (
-              <View
-                key={Math.random()}
-                style={{
-                  justifyContent:
-                    this.state.messages.data[item].sender ===
-                    MainStore.currentUser
-                      ? "flex-start"
-                      : "flex-end",
-                  backgroundColor:
-                    this.state.messages.data[item].sender ===
-                    MainStore.currentUser
-                      ? "rgb(218, 226, 239)"
-                      : "rgb(225, 239, 218)",
-                  flexDirection: "row"
-                }}
-              >
+            console.log(item);
+            if (this.state.messages.data[item].encrypted === false) {
+              console.log("non encrypted");
+              return (
                 <View
+                  key={Math.random()}
                   style={{
-                    flexDirection: "row",
-                    marginHorizontal: 10,
-                    marginVertical: 10,
-                    width: "60%"
+                    justifyContent:
+                      this.state.messages.data[item].sender ===
+                      MainStore.currentUser
+                        ? "flex-start"
+                        : "flex-end",
+                    backgroundColor:
+                      this.state.messages.data[item].sender ===
+                      MainStore.currentUser
+                        ? "rgb(218, 226, 239)"
+                        : "rgb(225, 239, 218)",
+                    flexDirection: "row"
                   }}
                 >
-                  <Card>
-                    <CardItem>
-                      <Text>{this.state.messages.data[item].value}</Text>
-                    </CardItem>
-                  </Card>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      marginHorizontal: 10,
+                      marginVertical: 10,
+                      width: "60%"
+                    }}
+                  >
+                    <Card>
+                      <CardItem>
+                        <Text>{this.state.messages.data[item].value}</Text>
+                      </CardItem>
+                    </Card>
+                  </View>
                 </View>
-              </View>
-            );
+              );
+            } else if (this.state.messages.data[item].encrypted === true) {
+              console.log("encrypted");
+              rsa.setPrivateString(
+                MainStore.allUsers[this.state.messages.data[item].Receiver]
+                  .privateKey
+              );
+              var decrypted = rsa.decrypt(this.state.messages.data[item].value);
+              return (
+                <View
+                  style={{
+                    justifyContent: "center",
+                    backgroundColor: "black",
+                    flexDirection: "row"
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      marginHorizontal: 10,
+                      marginVertical: 10,
+                      width: "60%"
+                    }}
+                  >
+                    <Card>
+                      <CardItem>
+                        <Text>{this.state.messages.data[item].value}</Text>
+                      </CardItem>
+                      <CardItem>
+                        <Text>{decrypted}</Text>
+                      </CardItem>
+                    </Card>
+                  </View>
+                </View>
+              );
+            }
           }}
         />
         <View
@@ -204,6 +244,11 @@ export default class App extends React.Component {
                       "/messages/data/" +
                       this.state.messages.nextKey.val
                   );
+                  rsa.setPublicString(
+                    MainStore.allUsers[MainStore.chatUser].publicKey
+                  );
+                  var originText = this.state.typedMessage;
+                  var encrypted = rsa.encrypt(originText);
                   firebase
                     .database()
                     .ref(
@@ -216,11 +261,11 @@ export default class App extends React.Component {
                         this.state.messages.nextKey.val
                     )
                     .set({
-                      value: this.state.typedMessage,
+                      value: encrypted,
                       type: "text",
                       sender: MainStore.currentUser,
                       Receiver: MainStore.chatUser,
-                      encrypted: false
+                      encrypted: true
                     });
                   firebase
                     .database()
@@ -247,11 +292,11 @@ export default class App extends React.Component {
                         this.state.messages.nextKey.val
                     )
                     .set({
-                      value: this.state.typedMessage,
+                      value: encrypted,
                       type: "text",
                       sender: MainStore.currentUser,
                       Receiver: MainStore.chatUser,
-                      encrypted: false
+                      encrypted: true
                     });
                   firebase
                     .database()
