@@ -41,6 +41,7 @@ export default class App extends React.Component {
             rounded
             primary
             style={{ alignSelf: "center", marginVertical: 20 }}
+            onPress={() => this.props.navigation.navigate("SignUp")}
           >
             <Text>Login</Text>
           </Button>

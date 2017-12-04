@@ -25,50 +25,106 @@ import {
   Fab
 } from "native-base";
 const { width, height } = Dimensions.get("window");
+import * as firebase from "firebase";
+import MainStore from "../MainStore/MainStore";
+import { observer } from "mobx-react/native";
 
+@observer
 export default class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      messages: [
-        { encrypted: false, self: false, value: "Hi how are you?" },
-        {
-          encrypted: false,
-          self: true,
-          value:
-            "All Good lkhasdkjhfksdan nfsadkfasd hifhsda fadskjbfjks fhihfdskjb kjhjkasfbs"
-        },
-        { encrypted: true, self: false, value: "Secret SuperSecret Message" }
-      ],
+      messages: {
+        nextKey: {
+          val: 0
+        }
+      },
       active: false,
-      encrypted: true
+      encrypted: true,
+      typedMessage: ""
     };
+  }
+  componentDidMount() {
+    // firebase
+    //   .database()
+    //   .ref(
+    //     "Users/" +
+    //       MainStore.currentUser +
+    //       "/chats/" +
+    //       MainStore.currentUser +
+    //       MainStore.chatUser +
+    //       "/messages/data/msgId" +
+    //       this.state.messages.nextKey
+    //   )
+    //   .set({
+    //     value: "Hello",
+    //     type: "text"
+    //   });
+    console.log(
+      "Users/" +
+        MainStore.currentUser +
+        "/chats/" +
+        MainStore.currentUser +
+        MainStore.chatUser +
+        "/messages"
+    );
+    firebase
+      .database()
+      .ref(
+        "Users/" +
+          MainStore.currentUser +
+          "/chats/" +
+          MainStore.currentUser +
+          MainStore.chatUser +
+          "/messages"
+      )
+      .on("value", snapshot => {
+        if (snapshot !== undefined) {
+          console.log(snapshot.val());
+          let val = snapshot.val();
+          this.setState({
+            messages: val ? val : undefined
+          });
+        }
+      });
   }
   render() {
     return (
       <Container>
         <Header>
           <Left>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => this.props.navigation.goBack()}>
               <Icon name="arrow-back" />
             </TouchableOpacity>
           </Left>
           <Body>
-            <Title>Manoj</Title>
+            <Title>{MainStore.chatUser}</Title>
           </Body>
           <Right />
         </Header>
         <FlatList
-          data={this.state.messages}
+          data={
+            this.state.messages.nextKey.val === 0
+              ? []
+              : Object.keys(this.state.messages.data)
+          }
           contentContainerStyle={{ paddingTop: 20 }}
+          keyExtractor={(item, index) => index}
           renderItem={({ item }) => {
             return (
               <View
+                key={Math.random()}
                 style={{
-                  justifyContent: item.self ? "flex-start" : "flex-end",
-                  backgroundColor: item.self
-                    ? "rgb(218, 226, 239)"
-                    : "rgb(225, 239, 218)",
+                  justifyContent:
+                    this.state.messages.data[item].sender ===
+                    MainStore.currentUser
+                      ? "flex-start"
+                      : "flex-end",
+                  backgroundColor:
+                    this.state.messages.data[item].sender ===
+                    MainStore.currentUser
+                      ? "rgb(218, 226, 239)"
+                      : "rgb(225, 239, 218)",
                   flexDirection: "row"
                 }}
               >
@@ -82,7 +138,7 @@ export default class App extends React.Component {
                 >
                   <Card>
                     <CardItem>
-                      <Text>{item.value}</Text>
+                      <Text>{this.state.messages.data[item].value}</Text>
                     </CardItem>
                   </Card>
                 </View>
@@ -106,6 +162,12 @@ export default class App extends React.Component {
                 color: this.state.encrypted ? "white" : "black",
                 padding: 2
               }}
+              onChange={event => {
+                console.log(event.nativeEvent.text);
+                this.setState({
+                  typedMessage: event.nativeEvent.text
+                });
+              }}
               onFocus={() => {
                 this.setState({
                   focussed: true
@@ -121,13 +183,91 @@ export default class App extends React.Component {
               }
             />
             <View style={{ flexDirection: "row" }}>
-              <TouchableOpacity style={{ marginHorizontal: 10 }}>
+              <TouchableOpacity
+                disabled={this.state.typedMessage === "" ? true : false}
+                style={{ marginHorizontal: 10 }}
+              >
                 <Icon
                   style={{ color: this.state.encrypted ? "white" : "black" }}
                   name="attach"
                 />
               </TouchableOpacity>
-              <TouchableOpacity style={{ marginHorizontal: 10 }}>
+              <TouchableOpacity
+                style={{ marginHorizontal: 10 }}
+                onPress={() => {
+                  console.log(
+                    "Users/" +
+                      MainStore.currentUser +
+                      "/chats/" +
+                      MainStore.currentUser +
+                      MainStore.chatUser +
+                      "/messages/data/" +
+                      this.state.messages.nextKey.val
+                  );
+                  firebase
+                    .database()
+                    .ref(
+                      "Users/" +
+                        MainStore.currentUser +
+                        "/chats/" +
+                        MainStore.currentUser +
+                        MainStore.chatUser +
+                        "/messages/data/msgId" +
+                        this.state.messages.nextKey.val
+                    )
+                    .set({
+                      value: this.state.typedMessage,
+                      type: "text",
+                      sender: MainStore.currentUser,
+                      Receiver: MainStore.chatUser,
+                      encrypted: false
+                    });
+                  firebase
+                    .database()
+                    .ref(
+                      "Users/" +
+                        MainStore.currentUser +
+                        "/chats/" +
+                        MainStore.currentUser +
+                        MainStore.chatUser +
+                        "/messages/nextKey"
+                    )
+                    .set({
+                      val: this.state.messages.nextKey.val + 1
+                    });
+                  firebase
+                    .database()
+                    .ref(
+                      "Users/" +
+                        MainStore.chatUser +
+                        "/chats/" +
+                        MainStore.chatUser +
+                        MainStore.currentUser +
+                        "/messages/data/msgId" +
+                        this.state.messages.nextKey.val
+                    )
+                    .set({
+                      value: this.state.typedMessage,
+                      type: "text",
+                      sender: MainStore.currentUser,
+                      Receiver: MainStore.chatUser,
+                      encrypted: false
+                    });
+                  firebase
+                    .database()
+                    .ref(
+                      "Users/" +
+                        MainStore.chatUser +
+                        "/chats/" +
+                        MainStore.chatUser +
+                        MainStore.currentUser +
+                        "/messages/nextKey"
+                    )
+                    .set({
+                      val: this.state.messages.nextKey.val + 1
+                    });
+                }}
+              >
                 <Text
                   style={{ color: this.state.encrypted ? "white" : "black" }}
                 >
